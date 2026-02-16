@@ -1,12 +1,18 @@
 import os
 import uuid
 import time
+import logging
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import yt_dlp
 
+# Configure logging to show up in Render logs
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
-CORS(app)
+# Enable CORS for all routes and origins
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 DOWNLOAD_FOLDER = 'downloads'
 if not os.path.exists(DOWNLOAD_FOLDER):
@@ -23,18 +29,39 @@ def cleanup_old_files():
             except:
                 pass
 
-# BROWSER MASQUERADING OPTIONS (Crucial for FB/Insta)
+# BROWSER MASQUERADING OPTIONS
 def get_common_opts():
     return {
         'quiet': True,
         'no_warnings': True,
-        # This User-Agent is key for Facebook/Instagram
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'nocheckcertificate': True,
+        'cachedir': False, # CRITICAL: Disable cache to prevent sticking to flagged sessions
+        'extract_flat': False,
+        # Aggressive masquerading for Data Center IPs (Render)
+        'extractor_args': {
+            'youtube': {
+                # Try 'ios' and 'android' first. 
+                # If these fail, 'tv' is a strong backup but might lack some formats.
+                # 'web' is excluded as it is the most blocked.
+                'player_client': ['ios', 'android', 'mweb']
+            }
+        },
+        # Standard headers to look like a generic browser
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-us,en;q=0.5',
+        }
     }
+
+# --- NEW: Root Route to fix 404s and wake up server ---
+@app.route('/', methods=['GET', 'OPTIONS'])
+def home():
+    return jsonify({"status": "Backend is running!", "message": "Hit /api/info to get video details."}), 200
 
 @app.route('/api/info', methods=['POST'])
 def get_video_info():
+    logger.info("Received /api/info request")
     data = request.json
     url = data.get('url')
     
@@ -45,6 +72,7 @@ def get_video_info():
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # download=False is key for info extraction
             info = ydl.extract_info(url, download=False)
             return jsonify({
                 'title': info.get('title'),
@@ -53,8 +81,10 @@ def get_video_info():
                 'platform': info.get('extractor_key'),
             })
     except Exception as e:
-        print(f"Info Error: {e}")
-        # Return a cleaner error message
+        logger.error(f"Info Error: {e}")
+        error_msg = str(e)
+        if "Sign in" in error_msg:
+             return jsonify({'error': 'Server IP blocked by YouTube (Bot Guard). Please try again later.'}), 429
         return jsonify({'error': 'Could not fetch info. The video might be private or link is invalid.'}), 400
 
 @app.route('/api/download', methods=['POST'])
@@ -65,6 +95,8 @@ def download_video():
     url = data.get('url')
     format_type = data.get('format', 'mp4')
     quality = data.get('quality', '1080p')
+    
+    logger.info(f"Downloading URL: {url} | Format: {format_type}")
 
     file_id = str(uuid.uuid4())
     output_template = f'{DOWNLOAD_FOLDER}/{file_id}.%(ext)s'
@@ -82,7 +114,6 @@ def download_video():
             }],
         })
     else:
-        # Improved Quality Selection
         if quality == '4k':
             ydl_opts['format'] = 'bestvideo[height<=2160]+bestaudio/best[height<=2160] / best[height<=2160] / best'
         elif quality == '1080p':
@@ -110,10 +141,11 @@ def download_video():
                 'download_url': f'/downloads/{downloaded_file}'
             })
         else:
+            logger.error("Download failed processing - File not found")
             return jsonify({'error': 'Download failed processing.'}), 500
 
     except Exception as e:
-        print(f"Download Error: {e}")
+        logger.error(f"Download Error: {e}")
         return jsonify({'error': f'Server Error: {str(e)}'}), 500
 
 @app.route('/downloads/<path:filename>')
@@ -121,4 +153,5 @@ def serve_file(filename):
     return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
