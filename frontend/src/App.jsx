@@ -10,10 +10,16 @@ const App = () => {
   const [videoInfo, setVideoInfo] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // --- AD CONFIGURATION (Ads yahan set karein) ---
+  // --- API CONFIGURATION ---
+  // Safely check for VITE_API_URL. 
+  // This syntax ensures it works in the preview (where import.meta might be empty) 
+  // AND in your Vite deployment.
+  const API_URL = (import.meta && import.meta.env && import.meta.env.VITE_API_URL) || "http://127.0.0.1:5000";
+
+  // --- AD CONFIGURATION ---
   const ADS = {
-    topAdLink: "https://omg10.com/4/10614485", // Yahan click hone wala link lagayein
-    topAdImage: "https://omg10.com/4/10614485", // Yahan Ad ki image ka URL lagayein
+    topAdLink: "https://omg10.com/4/10614485",
+    topAdImage: "https://omg10.com/4/10614485",
     
     bottomAdLink: "https://omg10.com/4/10614485",
     bottomAdImage: "https://omg10.com/4/10614485"
@@ -27,7 +33,10 @@ const App = () => {
     setErrorMessage('');
 
     try {
-        const infoResponse = await fetch('https://video-downloader-by-dreambyte.onrender.com', {
+        console.log(`Fetching info from: ${API_URL}/api/info`); // Debug log
+
+        // 1. Get Video Info
+        const infoResponse = await fetch(`${API_URL}/api/info`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
@@ -48,7 +57,8 @@ const App = () => {
 
         setStatus('downloading');
 
-        const downloadResponse = await fetch('https://video-downloader-by-dreambyte.onrender.com', {
+        // 2. Start Download Process
+        const downloadResponse = await fetch(`${API_URL}/api/download`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, format, quality })
@@ -63,7 +73,8 @@ const App = () => {
         setStatus('completed');
         setProgress(100);
         
-        window.location.href = `https://video-downloader-by-dreambyte.onrender.com${downloadData.download_url}`;
+        // 3. Redirect to the file on the backend
+        window.location.href = `${API_URL}${downloadData.download_url}`;
 
     } catch (error) {
         console.error(error);
@@ -209,10 +220,10 @@ const App = () => {
                {/* Quality Select - High Contrast */}
                <div className="relative">
                  <select 
-                    className="appearance-none bg-slate-800 border border-slate-600 text-white text-sm font-medium rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-3 px-4 outline-none cursor-pointer hover:border-slate-500 transition shadow-sm"
-                    value={quality}
-                    onChange={(e) => setQuality(e.target.value)}
-                    disabled={format === 'mp3'}
+                   className="appearance-none bg-slate-800 border border-slate-600 text-white text-sm font-medium rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-3 px-4 outline-none cursor-pointer hover:border-slate-500 transition shadow-sm"
+                   value={quality}
+                   onChange={(e) => setQuality(e.target.value)}
+                   disabled={format === 'mp3'}
                  >
                     <option value="4k">🌟 4K Ultra HD</option>
                     <option value="1080p">📺 1080p Full HD</option>
