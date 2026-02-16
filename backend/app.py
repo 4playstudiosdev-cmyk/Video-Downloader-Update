@@ -35,14 +35,22 @@ def get_common_opts():
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        # FIX: Remove hardcoded User-Agent (it was old and triggering bot detection)
-        # FIX: Use 'extractor_args' to force mobile clients. 
-        # YouTube often blocks Data Center IPs (Render) on the 'web' client, 
-        # but 'android'/'ios' clients often bypass this check.
+        'cachedir': False, # CRITICAL: Disable cache to prevent sticking to flagged sessions
+        'extract_flat': False,
+        # Aggressive masquerading for Data Center IPs (Render)
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios']
+                # Try 'ios' and 'android' first. 
+                # If these fail, 'tv' is a strong backup but might lack some formats.
+                # 'web' is excluded as it is the most blocked.
+                'player_client': ['ios', 'android', 'mweb']
             }
+        },
+        # Standard headers to look like a generic browser
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-us,en;q=0.5',
         }
     }
 
@@ -64,6 +72,7 @@ def get_video_info():
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # download=False is key for info extraction
             info = ydl.extract_info(url, download=False)
             return jsonify({
                 'title': info.get('title'),
@@ -73,6 +82,9 @@ def get_video_info():
             })
     except Exception as e:
         logger.error(f"Info Error: {e}")
+        error_msg = str(e)
+        if "Sign in" in error_msg:
+             return jsonify({'error': 'Server IP blocked by YouTube (Bot Guard). Please try again later.'}), 429
         return jsonify({'error': 'Could not fetch info. The video might be private or link is invalid.'}), 400
 
 @app.route('/api/download', methods=['POST'])
