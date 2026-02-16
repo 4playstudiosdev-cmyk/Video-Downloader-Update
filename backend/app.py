@@ -34,8 +34,16 @@ def get_common_opts():
     return {
         'quiet': True,
         'no_warnings': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'nocheckcertificate': True,
+        # FIX: Remove hardcoded User-Agent (it was old and triggering bot detection)
+        # FIX: Use 'extractor_args' to force mobile clients. 
+        # YouTube often blocks Data Center IPs (Render) on the 'web' client, 
+        # but 'android'/'ios' clients often bypass this check.
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios']
+            }
+        }
     }
 
 # --- NEW: Root Route to fix 404s and wake up server ---
