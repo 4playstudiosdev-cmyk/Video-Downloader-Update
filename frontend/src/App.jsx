@@ -27,7 +27,7 @@ const App = () => {
     setErrorMessage('');
 
     try {
-        const infoResponse = await fetch('http://127.0.0.1:5000/api/info', {
+        const infoResponse = await fetch('https://video-downloader-by-dreambyte.onrender.com', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
@@ -48,7 +48,7 @@ const App = () => {
 
         setStatus('downloading');
 
-        const downloadResponse = await fetch('http://127.0.0.1:5000/api/download', {
+        const downloadResponse = await fetch('https://video-downloader-by-dreambyte.onrender.com', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, format, quality })
@@ -63,7 +63,7 @@ const App = () => {
         setStatus('completed');
         setProgress(100);
         
-        window.location.href = `http://127.0.0.1:5000${downloadData.download_url}`;
+        window.location.href = `https://video-downloader-by-dreambyte.onrender.com${downloadData.download_url}`;
 
     } catch (error) {
         console.error(error);
