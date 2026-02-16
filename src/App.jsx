@@ -11,9 +11,10 @@ const App = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   // --- CONFIGURATION ---
-  // FIX: Aapke Screenshot ke mutabiq sahi link ye hai:
-  // Agar Render par aapne koi aur naam rakha hai, to wo link yahan paste karein.
-  const API_URL = 'https://uniload-backend.onrender.com';
+  // FIX: Aapki provided link ab yahan set kar di gayi hai.
+  // Note: Render free tier par server 'Sleep' mode mein chala jata hai.
+  // Pehli baar request karne par 1-2 minute lag sakte hain start hone mein.
+  const API_URL = 'https://video-downloader-by-dreambyte.onrender.com';
 
   const ADS = {
     topAdLink: "https://google.com", 
