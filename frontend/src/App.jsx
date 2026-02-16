@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, Link, Youtube, Facebook, Instagram, Twitter, Music, Video, CheckCircle, AlertCircle, Loader2, Zap, Shield, Globe, Smartphone } from 'lucide-react';
+import { Download, Link, Youtube, Facebook, Instagram, Twitter, Music, Video, CheckCircle, AlertCircle, Loader2, Zap, Shield, Globe, Smartphone, Menu } from 'lucide-react';
 
 const App = () => {
   const [url, setUrl] = useState('');
@@ -10,17 +10,13 @@ const App = () => {
   const [videoInfo, setVideoInfo] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // --- CONFIGURATION ---
-  // FIX: Aapki provided link ab yahan set kar di gayi hai.
-  // Note: Render free tier par server 'Sleep' mode mein chala jata hai.
-  // Pehli baar request karne par 1-2 minute lag sakte hain start hone mein.
-  const API_URL = 'https://video-downloader-by-dreambyte.onrender.com';
-
+  // --- AD CONFIGURATION (Ads yahan set karein) ---
   const ADS = {
-    topAdLink: "https://google.com", 
-    topAdImage: "https://placehold.co/728x90/1e293b/cbd5e1?text=Top+Banner+Ad+(728x90)",
-    bottomAdLink: "https://google.com",
-    bottomAdImage: "https://placehold.co/728x90/1e293b/cbd5e1?text=Bottom+Banner+Ad+(728x90)"
+    topAdLink: "https://omg10.com/4/10614485", // Yahan click hone wala link lagayein
+    topAdImage: "https://omg10.com/4/10614485", // Yahan Ad ki image ka URL lagayein
+    
+    bottomAdLink: "https://omg10.com/4/10614485",
+    bottomAdImage: "https://omg10.com/4/10614485"
   };
 
   const handleDownload = async () => {
@@ -31,26 +27,16 @@ const App = () => {
     setErrorMessage('');
 
     try {
-        console.log("Connecting to:", API_URL); // Debugging log
-
-        // Step 1: Info Fetching
-        const infoResponse = await fetch(`${API_URL}/api/info`, {
+        const infoResponse = await fetch('http://127.0.0.1:5000/api/info', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
         });
         
         if (!infoResponse.ok) {
-            // Agar server error de, to koshish karein JSON read karne ki
-            const errorText = await infoResponse.text();
-            let errMessage = 'Failed to fetch video info.';
-            try {
-                const errJson = JSON.parse(errorText);
-                errMessage = errJson.error || errMessage;
-            } catch (e) {}
-            throw new Error(errMessage);
+            const err = await infoResponse.json();
+            throw new Error(err.error || 'Failed to fetch video info.');
         }
-        
         const infoData = await infoResponse.json();
 
         setVideoInfo({
@@ -62,35 +48,26 @@ const App = () => {
 
         setStatus('downloading');
 
-        // Step 2: Download Request
-        const downloadResponse = await fetch(`${API_URL}/api/download`, {
+        const downloadResponse = await fetch('http://127.0.0.1:5000/api/download', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, format, quality })
         });
 
         if (!downloadResponse.ok) {
-             const errorText = await downloadResponse.text();
-             let errMessage = 'Download failed from server.';
-             try {
-                const errJson = JSON.parse(errorText);
-                errMessage = errJson.error || errMessage;
-             } catch (e) {}
-             throw new Error(errMessage);
+             const err = await downloadResponse.json();
+             throw new Error(err.error || 'Download failed from server.');
         }
-        
         const downloadData = await downloadResponse.json();
 
         setStatus('completed');
         setProgress(100);
         
-        // Step 3: Redirect to file
-        // Yahan bhi API_URL use hoga
-        window.location.href = `${API_URL}${downloadData.download_url}`;
+        window.location.href = `http://127.0.0.1:5000${downloadData.download_url}`;
 
     } catch (error) {
-        console.error("Download Error:", error);
-        setErrorMessage(error.message || "Failed to connect to server. Please try again.");
+        console.error(error);
+        setErrorMessage(error.message);
         setStatus('error');
     }
   };
