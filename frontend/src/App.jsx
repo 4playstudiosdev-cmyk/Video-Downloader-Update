@@ -11,35 +11,63 @@ const App = () => {
   const [errorMessage, setErrorMessage] = useState('');
 
   // --- API CONFIGURATION ---
-  // Safely check for VITE_API_URL. 
-  // This syntax ensures it works in the preview (where import.meta might be empty) 
-  // AND in your Vite deployment.
-  const API_URL = (import.meta && import.meta.env && import.meta.env.VITE_API_URL) || "http://127.0.0.1:5000";
+  // To avoid compilation errors in the preview environment (ES2015), 
+  // we are using the direct Render URL here.
+  // When running locally, you can switch this back to "http://127.0.0.1:5000" if needed.
+  const API_URL = "https://video-downloader-by-dreambyte.onrender.com";
 
   // --- AD CONFIGURATION ---
   const ADS = {
     topAdLink: "https://omg10.com/4/10614485",
     topAdImage: "https://omg10.com/4/10614485",
-    
     bottomAdLink: "https://omg10.com/4/10614485",
     bottomAdImage: "https://omg10.com/4/10614485"
   };
 
+  // Helper to handle fetch with timeout (fixes "hanging" issues)
+  const fetchWithTimeout = async (resource, options = {}) => {
+    const { timeout = 60000 } = options; // 60 seconds timeout (Render Cold Start takes time)
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal  
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      throw error;
+    }
+  }
+
   const handleDownload = async () => {
     if (!url) return;
+    
+    // Safety Check: Mixed Content Error
+    // If you are on HTTPS (Vercel) but trying to hit HTTP (Localhost), browsers block this.
+    if (window.location.protocol === 'https:' && API_URL.includes('127.0.0.1')) {
+        setErrorMessage("Configuration Error: You are on a Live Site (HTTPS) but trying to access Localhost. Please update API_URL to your Render address.");
+        setStatus('error');
+        return;
+    }
+
     setStatus('processing');
     setProgress(0);
     setVideoInfo(null);
     setErrorMessage('');
 
     try {
-        console.log(`Fetching info from: ${API_URL}/api/info`); // Debug log
+        console.log(`Connecting to Backend at: ${API_URL}`); 
 
-        // 1. Get Video Info
-        const infoResponse = await fetch(`${API_URL}/api/info`, {
+        // 1. Get Video Info (with 60s timeout for waking up server)
+        const infoResponse = await fetchWithTimeout(`${API_URL}/api/info`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ url }),
+            timeout: 60000 
         });
         
         if (!infoResponse.ok) {
@@ -57,11 +85,12 @@ const App = () => {
 
         setStatus('downloading');
 
-        // 2. Start Download Process
-        const downloadResponse = await fetch(`${API_URL}/api/download`, {
+        // 2. Start Download Process (Wait up to 2 mins for conversion)
+        const downloadResponse = await fetchWithTimeout(`${API_URL}/api/download`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, format, quality })
+            body: JSON.stringify({ url, format, quality }),
+            timeout: 120000 
         });
 
         if (!downloadResponse.ok) {
@@ -73,12 +102,19 @@ const App = () => {
         setStatus('completed');
         setProgress(100);
         
-        // 3. Redirect to the file on the backend
+        // 3. Redirect to the file
         window.location.href = `${API_URL}${downloadData.download_url}`;
 
     } catch (error) {
-        console.error(error);
-        setErrorMessage(error.message);
+        console.error("Download Error:", error);
+        
+        if (error.name === 'AbortError') {
+             setErrorMessage("Server Timeout: The backend is taking too long to wake up (Render Free Tier). Please click Download again in 30 seconds.");
+        } else if (error.message.includes('Failed to fetch')) {
+             setErrorMessage("Connection Error: Could not reach the backend. Check your API_URL setting.");
+        } else {
+             setErrorMessage(error.message);
+        }
         setStatus('error');
     }
   };
