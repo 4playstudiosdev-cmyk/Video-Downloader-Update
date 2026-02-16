@@ -10,64 +10,27 @@ const App = () => {
   const [videoInfo, setVideoInfo] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // --- API CONFIGURATION ---
-  // To avoid compilation errors in the preview environment (ES2015), 
-  // we are using the direct Render URL here.
-  // When running locally, you can switch this back to "http://127.0.0.1:5000" if needed.
-  const API_URL = "https://video-downloader-by-dreambyte.onrender.com";
-
-  // --- AD CONFIGURATION ---
+  // --- AD CONFIGURATION (Ads yahan set karein) ---
   const ADS = {
-    topAdLink: "https://omg10.com/4/10614485",
-    topAdImage: "https://omg10.com/4/10614485",
+    topAdLink: "https://omg10.com/4/10614485", // Yahan click hone wala link lagayein
+    topAdImage: "https://omg10.com/4/10614485", // Yahan Ad ki image ka URL lagayein
+    
     bottomAdLink: "https://omg10.com/4/10614485",
     bottomAdImage: "https://omg10.com/4/10614485"
   };
 
-  // Helper to handle fetch with timeout (fixes "hanging" issues)
-  const fetchWithTimeout = async (resource, options = {}) => {
-    const { timeout = 60000 } = options; // 60 seconds timeout (Render Cold Start takes time)
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    
-    try {
-      const response = await fetch(resource, {
-        ...options,
-        signal: controller.signal  
-      });
-      clearTimeout(id);
-      return response;
-    } catch (error) {
-      clearTimeout(id);
-      throw error;
-    }
-  }
-
   const handleDownload = async () => {
     if (!url) return;
-    
-    // Safety Check: Mixed Content Error
-    // If you are on HTTPS (Vercel) but trying to hit HTTP (Localhost), browsers block this.
-    if (window.location.protocol === 'https:' && API_URL.includes('127.0.0.1')) {
-        setErrorMessage("Configuration Error: You are on a Live Site (HTTPS) but trying to access Localhost. Please update API_URL to your Render address.");
-        setStatus('error');
-        return;
-    }
-
     setStatus('processing');
     setProgress(0);
     setVideoInfo(null);
     setErrorMessage('');
 
     try {
-        console.log(`Connecting to Backend at: ${API_URL}`); 
-
-        // 1. Get Video Info (with 60s timeout for waking up server)
-        const infoResponse = await fetchWithTimeout(`${API_URL}/api/info`, {
+        const infoResponse = await fetch('http://127.0.0.1:5000/api/info', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url }),
-            timeout: 60000 
+            body: JSON.stringify({ url })
         });
         
         if (!infoResponse.ok) {
@@ -85,12 +48,10 @@ const App = () => {
 
         setStatus('downloading');
 
-        // 2. Start Download Process (Wait up to 2 mins for conversion)
-        const downloadResponse = await fetchWithTimeout(`${API_URL}/api/download`, {
+        const downloadResponse = await fetch('http://127.0.0.1:5000/api/download', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, format, quality }),
-            timeout: 120000 
+            body: JSON.stringify({ url, format, quality })
         });
 
         if (!downloadResponse.ok) {
@@ -102,19 +63,11 @@ const App = () => {
         setStatus('completed');
         setProgress(100);
         
-        // 3. Redirect to the file
-        window.location.href = `${API_URL}${downloadData.download_url}`;
+        window.location.href = `http://127.0.0.1:5000${downloadData.download_url}`;
 
     } catch (error) {
-        console.error("Download Error:", error);
-        
-        if (error.name === 'AbortError') {
-             setErrorMessage("Server Timeout: The backend is taking too long to wake up (Render Free Tier). Please click Download again in 30 seconds.");
-        } else if (error.message.includes('Failed to fetch')) {
-             setErrorMessage("Connection Error: Could not reach the backend. Check your API_URL setting.");
-        } else {
-             setErrorMessage(error.message);
-        }
+        console.error(error);
+        setErrorMessage(error.message);
         setStatus('error');
     }
   };
@@ -256,10 +209,10 @@ const App = () => {
                {/* Quality Select - High Contrast */}
                <div className="relative">
                  <select 
-                   className="appearance-none bg-slate-800 border border-slate-600 text-white text-sm font-medium rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-3 px-4 outline-none cursor-pointer hover:border-slate-500 transition shadow-sm"
-                   value={quality}
-                   onChange={(e) => setQuality(e.target.value)}
-                   disabled={format === 'mp3'}
+                    className="appearance-none bg-slate-800 border border-slate-600 text-white text-sm font-medium rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-3 px-4 outline-none cursor-pointer hover:border-slate-500 transition shadow-sm"
+                    value={quality}
+                    onChange={(e) => setQuality(e.target.value)}
+                    disabled={format === 'mp3'}
                  >
                     <option value="4k">🌟 4K Ultra HD</option>
                     <option value="1080p">📺 1080p Full HD</option>
